@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import FooterLeft from './FooterLeft';
 import FooterRight from './FooterRight';
 import './VideoCard.css';
@@ -17,6 +17,7 @@ const VideoCard = (props) => {
     setVideoRef,
     autoplay,
     onVideoChange, // Callback function to notify parent when video changes
+    setCurrentVideo, // Pass setCurrentVideo to update current video in App.js
   } = props;
 
   const videoRef = useRef(null);
@@ -76,12 +77,18 @@ const VideoCard = (props) => {
     }
   };
 
+  // Set current video when video card is clicked
+  const handleVideoClick = () => {
+    setCurrentVideo(props.data); // Set current video info
+  };
+
   return (
     <div
       className="video"
       onMouseDown={handleMouseDown} // Start mouse tracking
       onMouseMove={handleMouseMove} // Handle mouse movement
       onMouseUp={handleMouseUp}    // Stop mouse tracking
+      onClick={handleVideoClick}  // Set current video when clicked
     >
       <video
         className="player"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import VideoCard from './components/VideoCard';
 import BottomNavbar from './components/BottomNavbar';
@@ -54,10 +54,11 @@ const videoUrls = [
 
 function App() {
   const [videos, setVideos] = useState([]);
+  const [filteredVideos, setFilteredVideos] = useState(videoUrls); // Filtered videos based on search query
+  const [searchQuery, setSearchQuery] = useState(""); // Store search query
   const [currentVideo, setCurrentVideo] = useState(null);
   const [showUploadInfo, setShowUploadInfo] = useState(false); // Track when to show upload info overlay
-  const videoRefs = useRef([]);
-  // Ref to track mouse drag coordinates
+  const videoRefs = useRef([]); // Store video references
   const dragRef = useRef({ isDragging: false, startY: 0 });
 
   useEffect(() => {
@@ -67,8 +68,7 @@ function App() {
   // Handle scroll and right arrow key to show video info
   useEffect(() => {
     const handleScroll = () => {
-      // Optimize: Only set state if it's not already true to avoid re-renders on every scroll event
-      setShowUploadInfo((prev) => !prev ? true : prev);
+      setShowUploadInfo(true);
     };
 
     const handleKeydown = (e) => {
@@ -194,17 +194,41 @@ function App() {
     videoRefs.current[index] = ref;
   };
 
-  return (
-    <div
-      className="app"
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="container">
-        <TopNavbar className="top-navbar" />
+  // Handle the hashtag search input
+  const handleSearchChange = (query) => {
+    setSearchQuery(query);
+    const filtered = videoUrls.filter((video) =>
+      video.description.toLowerCase().includes(query.toLowerCase()) // Search in the description
+    );
+    setFilteredVideos(filtered); // Set the filtered videos
+  };
 
-        {videos.map((video, index) => (
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const filteredVideos = videos.filter((video) =>
+      video.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredVideos(filteredVideos);
+  };
+
+  return (
+    <div className="app" onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
+      <div className="container">
+        <TopNavbar className="top-navbar" onSearch={handleSearchChange} />
+
+        {/* Search Bar */}
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Search by hashtag"
+            value={searchQuery}
+            onChange={handleSearchChange}
+          />
+          <button onClick={handleSearchSubmit}>Search</button>
+        </div>
+
+        {/* Video Cards */}
+        {filteredVideos.map((video, index) => (
           <VideoCard
             key={index}
             username={video.username}
