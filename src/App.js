@@ -54,34 +54,39 @@ const videoUrls = [
 
 function App() {
   const [videos, setVideos] = useState([]);
-  const [filteredVideos, setFilteredVideos] = useState(videoUrls); // Filtered videos based on search query
-  const [searchQuery, setSearchQuery] = useState(""); // Store search query
+  const [filteredVideos, setFilteredVideos] = useState(videoUrls);
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentVideo, setCurrentVideo] = useState(null);
-  const [showUploadInfo, setShowUploadInfo] = useState(false); // Track when to show upload info overlay
-  const videoRefs = useRef([]); // Store video references
+  const [showUploadInfo, setShowUploadInfo] = useState(false);
+  const videoRefs = useRef([]);
   const dragRef = useRef({ isDragging: false, startY: 0 });
 
   useEffect(() => {
     setVideos(videoUrls);
+    if (videoUrls.length > 0) {
+      setCurrentVideo(videoUrls[0]);
+    }
   }, []);
 
-  // Handle scroll and right arrow key to show video info
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowUploadInfo(true);
-    };
+  // Hàm hiển thị thông tin (dùng chung cho các sự kiện)
+  const triggerUploadInfo = () => {
+    setShowUploadInfo(true);
+  };
 
+  // Handle scroll (window) and right arrow key
+  useEffect(() => {
     const handleKeydown = (e) => {
       if (e.key === 'ArrowRight') {
-        setShowUploadInfo(true);
+        triggerUploadInfo();
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
+    // Vẫn giữ window scroll để dự phòng
+    window.addEventListener('scroll', triggerUploadInfo);
     window.addEventListener('keydown', handleKeydown);
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', triggerUploadInfo);
       window.removeEventListener('keydown', handleKeydown);
     };
   }, []);
@@ -94,62 +99,12 @@ function App() {
     }
   }, [showUploadInfo]);
 
-  // Handle Video Swipe / Key Change
-  const handleVideoChange = (direction) => {
-    const currentIndex = videos.findIndex((video) => video.url === currentVideo?.url);
-    let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-
-    // Boundary checks
-    if (newIndex < 0) newIndex = 0;
-    if (newIndex >= videos.length) newIndex = videos.length - 1;
-
-    const nextVideo = videos[newIndex];
-    if (nextVideo) {
-      setCurrentVideo(nextVideo);
-
-      // Programmatically scroll to the next video
-      const videoElement = videoRefs.current[newIndex];
-      if (videoElement) {
-        // Scroll the element into view smoothly
-        videoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
-  };
-
-  // --- Mouse Drag Logic ---
-  const handleMouseDown = (e) => {
-    dragRef.current.isDragging = true;
-    dragRef.current.startY = e.clientY;
-  };
-
-  const handleMouseUp = (e) => {
-    if (!dragRef.current.isDragging) return;
-
-    const diff = e.clientY - dragRef.current.startY;
-    const threshold = 50; // Minimum distance to trigger swipe
-
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0) {
-        // Dragged Down -> Previous Video
-        handleVideoChange('previous');
-      } else {
-        // Dragged Up -> Next Video
-        handleVideoChange('next');
-      }
-    }
-
-    dragRef.current.isDragging = false;
-  };
-
-  const handleMouseLeave = () => {
-    dragRef.current.isDragging = false;
-  };
-
+  // --- Intersection Observer Logic (Cập nhật currentVideo khi cuộn) ---
   useEffect(() => {
     const observerOptions = {
-      root: null,
+      root: null, // viewport
       rootMargin: '0px',
-      threshold: 0.8, // Play when 80% of the video is visible
+      threshold: 0.6, // Giảm xuống 0.6 (60%) để dễ nhận diện video hơn trên màn hình nhỏ
     };
 
     const handleIntersection = (entries) => {
@@ -157,21 +112,16 @@ function App() {
         const videoElement = entry.target;
 
         if (entry.isIntersecting) {
-          // Play the video
-          const playPromise = videoElement.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              console.log("Auto-play prevented or interrupted:", error);
-            });
-          }
+          videoElement.play().catch(err => console.log("Autoplay prevented", err));
 
-          // Identify which video is playing and set it as current
+          // Lấy index của video trong danh sách Refs hiện tại
           const index = videoRefs.current.indexOf(videoElement);
-          if (index !== -1 && videos[index]) {
-            setCurrentVideo((prev) => (prev !== videos[index] ? videos[index] : prev));
+
+          // Nếu tìm thấy index hợp lệ, cập nhật currentVideo theo danh sách đang hiển thị (filteredVideos)
+          if (index !== -1 && filteredVideos[index]) {
+            setCurrentVideo(filteredVideos[index]);
           }
         } else {
-          // Pause the video
           videoElement.pause();
         }
       });
@@ -188,82 +138,127 @@ function App() {
     return () => {
       if (observer) observer.disconnect();
     };
-  }, [videos]);
+  }, [filteredVideos]); // Re-run khi danh sách thay đổi
+
+  // Handle Video Swipe / Key Change
+  const handleVideoChange = (direction) => {
+    const currentIndex = filteredVideos.findIndex((video) => video.url === currentVideo?.url);
+    let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= filteredVideos.length) newIndex = filteredVideos.length - 1;
+
+    const nextVideo = filteredVideos[newIndex];
+    if (nextVideo) {
+      setCurrentVideo(nextVideo);
+      // Gọi hiển thị info khi chuyển video bằng swipe/phím
+      triggerUploadInfo();
+
+      const videoElement = videoRefs.current[newIndex];
+      if (videoElement) {
+        videoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  // --- Mouse Drag Logic ---
+  const handleMouseDown = (e) => {
+    dragRef.current.isDragging = true;
+    dragRef.current.startY = e.clientY;
+  };
+
+  const handleMouseUp = (e) => {
+    if (!dragRef.current.isDragging) return;
+
+    const diff = e.clientY - dragRef.current.startY;
+    const threshold = 50;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0) {
+        handleVideoChange('previous');
+      } else {
+        handleVideoChange('next');
+      }
+    }
+
+    dragRef.current.isDragging = false;
+  };
+
+  const handleMouseLeave = () => {
+    dragRef.current.isDragging = false;
+  };
 
   const handleVideoRef = (index) => (ref) => {
     videoRefs.current[index] = ref;
   };
 
-  // Handle the hashtag search input
   const handleSearchChange = (query) => {
     setSearchQuery(query);
     const filtered = videoUrls.filter((video) =>
-      video.description.toLowerCase().includes(query.toLowerCase()) // Search in the description
+      video.description.toLowerCase().includes(query.toLowerCase())
     );
-    setFilteredVideos(filtered); // Set the filtered videos
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    const filteredVideos = videos.filter((video) =>
-      video.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredVideos(filteredVideos);
+    setFilteredVideos(filtered);
+    if (filtered.length > 0) {
+      setCurrentVideo(filtered[0]);
+    } else {
+      setCurrentVideo(null);
+    }
   };
 
   return (
-    <div className="app" onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
+    <div
+      className="app"
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      onWheel={triggerUploadInfo} /* Bắt sự kiện lăn chuột */
+      onScroll={triggerUploadInfo} /* QUAN TRỌNG: Bắt sự kiện cuộn trên container chính */
+    >
       <div className="container">
         <TopNavbar className="top-navbar" onSearch={handleSearchChange} />
 
-        {/* Search Bar */}
-        <div className="search-bar">
-          <input
-            type="text"
-            placeholder="Search by hashtag"
-            value={searchQuery}
-            onChange={handleSearchChange}
-          />
-          <button onClick={handleSearchSubmit}>Search</button>
-        </div>
+        {filteredVideos.length === 0 ? (
+          <div style={{ color: 'white', textAlign: 'center', marginTop: '50%' }}>No results found</div>
+        ) : (
+          filteredVideos.map((video, index) => (
+            <VideoCard
+              key={index}
+              username={video.username}
+              description={video.description}
+              song={video.song}
+              likes={video.likes}
+              saves={video.saves}
+              comments={video.comments}
+              shares={video.shares}
+              url={video.url}
+              profilePic={video.profilePic}
+              setVideoRef={handleVideoRef(index)}
+              setCurrentVideo={setCurrentVideo}
+              onVideoChange={handleVideoChange}
+              data={video}
+            />
+          ))
+        )}
 
-        {/* Video Cards */}
-        {filteredVideos.map((video, index) => (
-          <VideoCard
-            key={index}
-            username={video.username}
-            description={video.description}
-            song={video.song}
-            likes={video.likes}
-            saves={video.saves}
-            comments={video.comments}
-            shares={video.shares}
-            url={video.url}
-            profilePic={video.profilePic}
-            setVideoRef={handleVideoRef(index)}
-            setCurrentVideo={setCurrentVideo}
-            onVideoChange={handleVideoChange} // Pass the missing function
-            data={video}
-          />
-        ))}
-
-        {/* Upload Info Overlay */}
+        {/* Upload Info Overlay - ĐÃ CHỈNH SỬA KÍCH THƯỚC NHỎ HƠN */}
         {showUploadInfo && currentVideo && (
           <div className="upload-info-overlay" style={{
-            position: 'absolute',
+            position: 'fixed',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)', // Darker, cleaner background
-            backdropFilter: 'blur(8px)', // Glassmorphism effect
-            padding: '25px',
-            borderRadius: '16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            padding: '15px', // Đã giảm padding
+            borderRadius: '15px', // Đã giảm border radius
             color: 'white',
-            zIndex: 1000,
+            zIndex: 2000,
             textAlign: 'center',
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)', // Modern shadow
-            minWidth: '280px',
-            border: '1px solid rgba(255, 255, 255, 0.18)' // Subtle border
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+            minWidth: '220px', // Đã giảm độ rộng
+            maxWidth: '280px', // Giới hạn độ rộng tối đa
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'opacity 0.3s ease'
           }}>
             <div className="upload-info-content">
               {currentVideo.profilePic && (
@@ -272,21 +267,30 @@ function App() {
                   alt="profile"
                   className="upload-info-profile"
                   style={{
-                    width: '60px',
-                    height: '60px',
+                    width: '50px', // Đã giảm kích thước ảnh
+                    height: '50px',
                     borderRadius: '50%',
-                    marginBottom: '15px',
+                    marginBottom: '10px',
                     border: '2px solid white',
-                    objectFit: 'cover'
+                    objectFit: 'cover',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                   }}
                 />
               )}
               <div className="upload-info-details">
-                <p style={{ margin: '0 0 5px 0', fontSize: '1.2rem' }}><strong>@{currentVideo.username}</strong></p>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.95rem', opacity: 0.9 }}>{currentVideo.description}</p>
-                <p style={{ margin: '0', fontSize: '0.85rem', color: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                <p style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold' }}>@{currentVideo.username}</p> {/* Giảm font size */}
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', lineHeight: '1.3', opacity: 0.9 }}>{currentVideo.description}</p> {/* Giảm font size */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255,255,255,0.1)',
+                  padding: '4px 10px',
+                  borderRadius: '15px',
+                  fontSize: '0.8rem' // Giảm font size
+                }}>
                   <span>🎵</span> <em>{currentVideo.song}</em>
-                </p>
+                </div>
               </div>
             </div>
           </div>
