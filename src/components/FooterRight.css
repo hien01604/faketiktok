@@ -62,3 +62,204 @@
     transform: rotate(360deg);
   }
 }
+.copy-message {
+  color: green;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 5px;
+  display: inline-block;
+}
+
+.share-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+  z-index: 999;
+}
+
+.share-popup button {
+  background-color: #ff0000;
+  color: white;
+  padding: 10px;
+  border: none;
+  margin: 5px;
+  cursor: pointer;
+}
+
+.share-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  /* Nền tối mờ */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  /* Đảm bảo nổi lên trên cùng */
+  backdrop-filter: blur(3px);
+  /* Hiệu ứng mờ nền phía sau */
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Hộp nội dung chính */
+.share-content {
+  background: #ffffff;
+  width: 90%;
+  max-width: 380px;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease-out;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Header của popup */
+.share-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.share-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 5px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+}
+
+/* Lưới chứa các icon */
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  /* 4 cột đều nhau */
+  gap: 15px;
+}
+
+.share-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.share-item:hover {
+  transform: scale(1.05);
+}
+
+.share-item span {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #555;
+  text-align: center;
+}
+
+/* Style cho vòng tròn bao quanh icon */
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  color: white;
+}
+
+/* Màu sắc riêng cho từng mạng xã hội */
+.facebook-bg {
+  background: linear-gradient(to bottom right, #18acfe, #0163e0);
+}
+
+.instagram-bg {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+}
+
+.threads-bg {
+  background: #000000;
+}
+
+.copy-bg {
+  background: #4caf50;
+  /* Màu xanh lá cho copy */
+}
+
+/* Animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+/* Media query cho màn hình điện thoại (dưới 768px) */
+@media (max-width: 768px) {
+  .share-overlay {
+    align-items: flex-end;
+    /* Đẩy nội dung xuống đáy */
+  }
+
+  .share-content {
+    width: 100%;
+    /* Chiếm toàn bộ chiều rộng */
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    /* Bo tròn 2 góc trên */
+    padding-bottom: 30px;
+    /* Thêm khoảng trống ở dưới để tránh chạm mép */
+    margin: 0;
+    animation: slideUpMobile 0.3s ease-out;
+  }
+}
+
+/* Animation trượt từ dưới lên cho mobile */
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    /* Bắt đầu từ ngoài màn hình phía dưới */
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}

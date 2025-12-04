@@ -4,7 +4,7 @@ import VideoCard from './components/VideoCard';
 import BottomNavbar from './components/BottomNavbar';
 import TopNavbar from './components/TopNavbar';
 
-// This array holds information about different videos
+// Data for videos
 const videoUrls = [
   {
     url: require('./videos/video1.mp4'),
@@ -54,27 +54,124 @@ const videoUrls = [
 
 function App() {
   const [videos, setVideos] = useState([]);
+  const [currentVideo, setCurrentVideo] = useState(null);
+  const [showUploadInfo, setShowUploadInfo] = useState(false); // Track when to show upload info overlay
   const videoRefs = useRef([]);
+  // Ref to track mouse drag coordinates
+  const dragRef = useRef({ isDragging: false, startY: 0 });
 
   useEffect(() => {
     setVideos(videoUrls);
   }, []);
 
+  // Handle scroll and right arrow key to show video info
+  useEffect(() => {
+    const handleScroll = () => {
+      // Optimize: Only set state if it's not already true to avoid re-renders on every scroll event
+      setShowUploadInfo((prev) => !prev ? true : prev);
+    };
+
+    const handleKeydown = (e) => {
+      if (e.key === 'ArrowRight') {
+        setShowUploadInfo(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('keydown', handleKeydown);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('keydown', handleKeydown);
+    };
+  }, []);
+
+  // Hide the upload info after 3 seconds
+  useEffect(() => {
+    if (showUploadInfo) {
+      const timer = setTimeout(() => setShowUploadInfo(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showUploadInfo]);
+
+  // Handle Video Swipe / Key Change
+  const handleVideoChange = (direction) => {
+    const currentIndex = videos.findIndex((video) => video.url === currentVideo?.url);
+    let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+    // Boundary checks
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= videos.length) newIndex = videos.length - 1;
+
+    const nextVideo = videos[newIndex];
+    if (nextVideo) {
+      setCurrentVideo(nextVideo);
+
+      // Programmatically scroll to the next video
+      const videoElement = videoRefs.current[newIndex];
+      if (videoElement) {
+        // Scroll the element into view smoothly
+        videoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  // --- Mouse Drag Logic ---
+  const handleMouseDown = (e) => {
+    dragRef.current.isDragging = true;
+    dragRef.current.startY = e.clientY;
+  };
+
+  const handleMouseUp = (e) => {
+    if (!dragRef.current.isDragging) return;
+
+    const diff = e.clientY - dragRef.current.startY;
+    const threshold = 50; // Minimum distance to trigger swipe
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0) {
+        // Dragged Down -> Previous Video
+        handleVideoChange('previous');
+      } else {
+        // Dragged Up -> Next Video
+        handleVideoChange('next');
+      }
+    }
+
+    dragRef.current.isDragging = false;
+  };
+
+  const handleMouseLeave = () => {
+    dragRef.current.isDragging = false;
+  };
+
   useEffect(() => {
     const observerOptions = {
       root: null,
       rootMargin: '0px',
-      threshold: 0.8, // Adjust this value to change the scroll trigger point
+      threshold: 0.8, // Play when 80% of the video is visible
     };
 
-    // This function handles the intersection of videos
     const handleIntersection = (entries) => {
       entries.forEach((entry) => {
+        const videoElement = entry.target;
+
         if (entry.isIntersecting) {
-          const videoElement = entry.target;
-          videoElement.play();
+          // Play the video
+          const playPromise = videoElement.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((error) => {
+              console.log("Auto-play prevented or interrupted:", error);
+            });
+          }
+
+          // Identify which video is playing and set it as current
+          const index = videoRefs.current.indexOf(videoElement);
+          if (index !== -1 && videos[index]) {
+            setCurrentVideo((prev) => (prev !== videos[index] ? videos[index] : prev));
+          }
         } else {
-          const videoElement = entry.target;
+          // Pause the video
           videoElement.pause();
         }
       });
@@ -82,27 +179,31 @@ function App() {
 
     const observer = new IntersectionObserver(handleIntersection, observerOptions);
 
-    // We observe each video reference to trigger play/pause
-    videoRefs.current.forEach((videoRef) => {
-      observer.observe(videoRef);
-    });
+    if (videoRefs.current.length > 0) {
+      videoRefs.current.forEach((videoRef) => {
+        if (videoRef) observer.observe(videoRef);
+      });
+    }
 
-    // We disconnect the observer when the component is unmounted
     return () => {
-      observer.disconnect();
+      if (observer) observer.disconnect();
     };
   }, [videos]);
 
-  // This function handles the reference of each video
   const handleVideoRef = (index) => (ref) => {
     videoRefs.current[index] = ref;
   };
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className="container">
         <TopNavbar className="top-navbar" />
-        {/* Here we map over the videos array and create VideoCard components */}
+
         {videos.map((video, index) => (
           <VideoCard
             key={index}
@@ -116,14 +217,61 @@ function App() {
             url={video.url}
             profilePic={video.profilePic}
             setVideoRef={handleVideoRef(index)}
-            autoplay={index === 0}
+            setCurrentVideo={setCurrentVideo}
+            onVideoChange={handleVideoChange} // Pass the missing function
+            data={video}
           />
         ))}
+
+        {/* Upload Info Overlay */}
+        {showUploadInfo && currentVideo && (
+          <div className="upload-info-overlay" style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)', // Darker, cleaner background
+            backdropFilter: 'blur(8px)', // Glassmorphism effect
+            padding: '25px',
+            borderRadius: '16px',
+            color: 'white',
+            zIndex: 1000,
+            textAlign: 'center',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)', // Modern shadow
+            minWidth: '280px',
+            border: '1px solid rgba(255, 255, 255, 0.18)' // Subtle border
+          }}>
+            <div className="upload-info-content">
+              {currentVideo.profilePic && (
+                <img
+                  src={currentVideo.profilePic}
+                  alt="profile"
+                  className="upload-info-profile"
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    marginBottom: '15px',
+                    border: '2px solid white',
+                    objectFit: 'cover'
+                  }}
+                />
+              )}
+              <div className="upload-info-details">
+                <p style={{ margin: '0 0 5px 0', fontSize: '1.2rem' }}><strong>@{currentVideo.username}</strong></p>
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.95rem', opacity: 0.9 }}>{currentVideo.description}</p>
+                <p style={{ margin: '0', fontSize: '0.85rem', color: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <span>🎵</span> <em>{currentVideo.song}</em>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <BottomNavbar className="bottom-navbar" />
       </div>
     </div>
   );
-  
 }
 
 export default App;
